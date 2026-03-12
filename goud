@@ -1,3 +1,65 @@
 files is creaed
 for jenkins
 to automate
+
+
+Kubernetes
+
+Need to install docker
+ yum install docker -y && systemctl start docker
+ 
+Need to install minikube
+curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+
+minikube version--> to check the version
+minikube start --driver=docker --force  -->  to start the minikube
+minikube status--> to check the status
+
+CLI(Command Line Interface)
+kubectl -- it is a CLI tool for kubernetes that starts with kubectl for all commands
+
+To install kubectl
+ go to browser -- serach with kubectl instal
+  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+  chmod +x kubectl--> to give the x permissions
+   mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
+   kubectl version--> to check whether installed or not
+   
+Need to cretae a pod--> 
+Imperative---- will create by using commands
+Delarative---- will create by using manifest files (In real time we use this)
+
+ kubectl api-resources--. to check th elist of resources
+ 
+cretae a pod in imperative way
+  kubectl run mypod --image=nginx--> to cretae a pod
+  kubectl get pods--> to check the pods
+  
+cretae a pod in Delarative way
+  vim pod.yml
+    ---
+apiVersion:v1
+kind: Pod
+metadata:
+  name: devops-pod
+spec:
+  containers:
+    - name: mycontainer
+      image: shaikmustafa/dm
+      ports:
+        - containerPort: 80
+		
+kubectl create -f pod.yml--> to execute the pod file
+kubectl get po -o wide--> to check the Ip address and node details
+kubectl get po -o yaml--> to check the Ip address and node details pf POD in yaml format
+kubectl get po -o json--> to check the Ip address and node details pf POD in json format
+kubectl get po mypod -o yaml--. to check specific pod Ip address and node details
+kubectl describe pod mypod--> to get complete info about pod
+kubectl delete pod mypod--> to delete the pod
+kubectl delete pod --all--> to delete all the pods
+kubectl get po --> to check the pods
+
+
+
+     
