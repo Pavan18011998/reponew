@@ -62,4 +62,137 @@ kubectl get po --> to check the pods
 
 
 
+
+Class:3
+
+
+ KOPS:Kubernetes Operations:  KOPS is multi-node cluster(IT is used to create multi-node)
+ Labels, Selectors and  node selectors
+ By using KOPS, if we create kubernetes cluster automatically it'll create entire infra strucure(servers, network groups, autoscaling groups, load balancers, security groups etc..,)
+ 
+ To setup a KOPS
+ -- launch ec2 instance (t3 micro is enough)
+ -- KOPS install
+ -- cluster install
+ -- kubectl install
+ 
+ cluster is nothing but group of servers
+ 
+launch instance
+KOPS install (chrome-> kops install-> )
+curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+chmod +x kops
+sudo mv kops /usr/local/bin/kops
+
+kops version--> to check the version
+
+ami-0ec10929233384c7f(N.Vergenia)
+ami-080254318c2d8932f(Europe (stackholm))
+
+we need to configure s3 bucket with EC2
+AWS--> actions--> security--> modify IAM role
+aws s3 ls--> to check the s3 buckets
+aws s3 mb s3://pavan18.kops--> to create a bucket in s3
+export KOPS_STATE_STORE=s3://pavan18.kops--> to store the data in a specific bucket
+
+now need to create Cluster
+kops create cluster --name=pavan.k8s.local --zones=eu-west-1a,eu-west-1b 
+--master-count=1 --master-size=c7i-flex.large --master-volume-size=30 
+--node-count=2 --node-size=t3.micro --node-volume-size=20 --image=ami-080254318c2d8932f
+
+Need to install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+  chmod +x kubectl--> to give the x permissions
+   mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
+   kubectl version--> to check whether installed or not
+
+kubectl get nodes--> to check the nodes
+
+we can check what all the resources are getting created in aws
+s3
+vpc
+ec2
+load balancers
+auto scaling
+
+Now need to create a pod
+vim pod.yml
+ ---
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: mypod
+ spec:
+   containers:
+    - name: cont-1
+	  image: shaikmustafa/dm
+	  ports:
+	   - containerPort: 80
+	   
+kubectl create -f pod.yml
+kubectl get po
+kubectl describe pod mypod--. now need to check the labels are present
+kubectl get po --show-labels--> this command will list all the pods along with labels
+
+now we need to assign a label to the pod in yaml file
+
+vim pod.yml
+ ---
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: mypod-1
+   labels:
+     env: dev
+	 app: swiggy
+	 client: tcs
+ spec:
+   containers:
+    - name: cont-1
+	  image: shaikmustafa/dm
+	  ports:
+	   - containerPort: 80
+	   
+kubectl create -f pod.yml
+kubectl get po
+kubectl get po --show-labels
+by using same manifest file we can create multiple pods
+
+vim pod.yml
+ ---
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: mypod-1
+   labels:
+     env: test
+	 app: swiggy
+	 client: infosys
+ spec:
+   containers:
+    - name: cont-1
+	  image: shaikmustafa/dm
+	  ports:
+	   - containerPort: 80
+	   
+kubectl create -f pod.yml
+kubectl get po
+kubectl get po --show-labels
+
+If we want to attach a label to existing pod that don't have
+kubectl label pod mypod "env=test"
+kubectl label pod mypod course=devops cloud=aws
+
+kubectl get po -l app=swiggy--> to get a specific app
+kubectl get po -l env=test
+kubectl get po -l env!=test--> we'll get otherthsn test env
+ebs-- equality based selector ex: (env=test)
+sbs-- set based selector ex (env in (dev,test)')
+kubectl get po -l 'env in (dev,test)'--> to get set of labels
+
+node selector is used to sleect a particular node
+kubectl get no--> to check the nodes
+kubectl get node nodeid node=node2--> to attach node
+
+
      
