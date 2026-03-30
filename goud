@@ -66,7 +66,7 @@ kubectl get po --> to check the pods
 Class:3
 
 
- KOPS:Kubernetes Operations:  KOPS is multi-node cluster(IT is used to create multi-node)
+ KOPS:Kubernetes Operations:  KOPS is multi-node cluster(It is used to create multi-node)
  Labels, Selectors and  node selectors
  By using KOPS, if we create kubernetes cluster automatically it'll create entire infra strucure(servers, network groups, autoscaling groups, load balancers, security groups etc..,)
  
@@ -79,6 +79,7 @@ Class:3
  cluster is nothing but group of servers
  
 launch instance
+“kops is an open-source tool used to create, manage, and maintain Kubernetes clusters on AWS infrastructure.
 KOPS install (chrome-> kops install-> )
 curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
 chmod +x kops
@@ -87,6 +88,7 @@ sudo mv kops /usr/local/bin/kops
 kops version--> to check the version
 
 ami-0ec10929233384c7f(N.Vergenia)
+ami-0ec10929233384c7f
 ami-080254318c2d8932f(Europe (stackholm))
 
 we need to configure s3 bucket with EC2
@@ -96,9 +98,19 @@ aws s3 mb s3://pavan18.kops--> to create a bucket in s3
 export KOPS_STATE_STORE=s3://pavan18.kops--> to store the data in a specific bucket
 
 now need to create Cluster
-kops create cluster --name=pavan.k8s.local --zones=eu-west-1a,eu-west-1b 
---master-count=1 --master-size=c7i-flex.large --master-volume-size=30 
---node-count=2 --node-size=t3.micro --node-volume-size=20 --image=ami-080254318c2d8932f
+kops create cluster --name=pavan1.k8s.local --zones=us-east-1a,us-east-1b --master-count=1 --master-size=c7i-flex.large --master-volume-size=30 --node-count=2 --node-size=t3.micro --node-volume-size=20 --image=ami-0ec10929233384c7f
+
+Cluster configuration has been created.
+
+Suggestions:
+ * list clusters with: kops get cluster
+ * edit this cluster with: kops edit cluster pavan1.k8s.local
+ * edit your node instance group: kops edit ig --name=pavan1.k8s.local nodes-us-east-1a
+ * edit your control-plane instance group: kops edit ig --name=pavan1.k8s.local control-plane-us-east-1a
+
+Finally configure your cluster with: kops update cluster --name pavan1.k8s.local --yes --admin
+
+
 
 Need to install kubectl
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
@@ -185,14 +197,248 @@ kubectl label pod mypod course=devops cloud=aws
 
 kubectl get po -l app=swiggy--> to get a specific app
 kubectl get po -l env=test
-kubectl get po -l env!=test--> we'll get otherthsn test env
+kubectl get po -l env!=test--> we'll get otherthan test env
 ebs-- equality based selector ex: (env=test)
 sbs-- set based selector ex (env in (dev,test)')
 kubectl get po -l 'env in (dev,test)'--> to get set of labels
 
 node selector is used to sleect a particular node
 kubectl get no--> to check the nodes
-kubectl get node nodeid node=node2--> to attach node
+
+NodeSelector is used to select a particular node to create a pod
+kubectl label node i-0ed0d915a0f544280 node=node2--> to attach the specific node
+kubectl get node --show-labels--> to check whwther it's labelled or not
+kubectl get node --show-labels | grep -i "node=node2" --> to highlight the node
+
+here we are writing manifest file for nodeSelector to create a pod
+vim pod.yml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod3
+  labels:
+     env: test
+     app: swiggy
+     client: infosys
+
+spec:
+  nodeSelector:
+    node: node2
+  containers:
+    - name: cont-1
+      image: shaikmustafa/dm
+      ports:
+        -  containerPort: 80
+		
+kubectl create -f pod.yml--> after running this command it'll create a pod in worker node2
+kubectl get po -o wide--> to check the pod
+
+Here we need to delete the cluster by using command, if we delete servers manually then those will cretaed again automatically
+export KOPS_STATE_STORE=s3://pavan.18kops --> 
+kops get cluster--> to know the cluster name
+kops delete cluster --name pavan1.k8s.local --yes --> to delete the cluster
+
+
+
+
+
+
+
+
+
+Class 4
+
+
+Service:
+
+By default we can't access pods in kuberenetes.
+If we want to access then we need to expose pods, to do this we use services
+
+Kuberenetes Services:
+Cluster-IP: This type of service is used expose the pods within the cluster. It provides a stable IP.
+            By usimng this stable IP we can access the application internally (within the server)
+NodePort: this type of service is used to expose the pods. It provides a stable Ip and nodePort.
+          It has a range from 30000 to 32767 
+LoadBalancer: this type of service is used to expose the pods. It provides a stable Ip and nodePort and DNS(Domain Name System)
+             Instead of using IP address for accessing the application we can use DNS (ex: http:192.168.2.1.80 (http:www.facebbok.com))
+
+
+need to install kops
+
+curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+chmod +x kops
+sudo mv kops /usr/local/bin/kops
+kops version--> to check the version
+
+need to install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+  chmod +x kubectl--> to give the x permissions
+   mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
+   kubectl version--> to check whether installed or not
+
+we need to configure s3 bucket with EC2
+AWS--> actions--> security--> modify IAM role
+aws s3 ls--> to check the s3 buckets
+aws s3 mb s3://pavan18.kops--> to create a bucket in s3
+export KOPS_STATE_STORE=s3://pavan18.kops--> to store the data in a specific bucket
+
+now need to create Cluster
+kops create cluster --name=pavan1.k8s.local --zones=us-east-1a,us-east-1b --master-count=1 --master-size=c7i-flex.large --master-volume-size=30 --node-count=2 --node-size=t3.micro --node-volume-size=20 --image=ami-0ec10929233384c7f
+
+Cluster configuration has been created.
+
+Suggestions:
+ * list clusters with: kops get cluster
+ * edit this cluster with: kops edit cluster pavan1.k8s.local
+ * edit your node instance group: kops edit ig --name=pavan1.k8s.local nodes-us-east-1a
+ * edit your control-plane instance group: kops edit ig --name=pavan1.k8s.local control-plane-us-east-1a
+
+Finally configure your cluster with: kops update cluster --name pavan1.k8s.local --yes --admin (it'll take time)
+
+we can check what all the resources are getting created in aws
+s3
+vpc
+ec2
+load balancers
+auto scaling
+
+vim pod.yml
+ ---
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: mypod-1
+   labels:
+     app: bus
+ spec:
+   containers:
+    - name: cont-1
+	  image: shaikmustafa/paytm:bus
+	  ports:
+	   - containerPort: 80
+	   
+kubectl create -f pod.yml
+kubectl get po
+kubectl describe pod mypod--. now need to check the labels are present
+kubectl get po --show-labels--> this command will list all the pods along with labels
+
+vim pod.yml
+ ---
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: mypod-2
+   labels:
+     app: movie
+ spec:
+   containers:
+    - name: cont-1
+	  image: shaikmustafa/paytm:movie
+	  ports:
+	   - containerPort: 80
+	   
+kubectl create -f pod.yml
+kubectl get po
+
+vim pod.yml
+ ---
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: mypod-3
+   labels:
+     app: nginx
+ spec:
+   containers:
+    - name: cont-1
+	  image: nginx
+	  ports:
+	   - containerPort: 80
+	   
+kubectl create -f pod.yml
+kubectl get po
+
+Now we have created 3 pods
+
+kubectl get po --show-labels --> to check the pods with labels
+
+Now we need to use the services to expose, need to write a yaml file
+kubectl api -resources--> to check the versions
+kubectl api -resources | grep -i "service" --> to check the specific resource
+
+vim service.yml
+
+ ---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   name: myservice
+   
+  spec:
+   type: ClusterIP
+   selector: 
+     app: bus
+   ports:
+    - port: 80  # this is service port (comment)
+	  targetPort: 80  # this is container port (comment)
+	  
+kubectl create -f service.yml--> to create the service
+kubectl get svc --> to chck the service
+kubectl describe svc myservice--> to get the details
+To access internally - copy cluster IP-connect any one instance from AWS
+curl  clusterIP--> to access internally (we can't access in browser, coz we can access internally only)
+
+vim service.yml
+---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   name: devops-svc
+   
+  spec:
+   type: NodePort
+   selector: 
+     app: movie
+   ports:
+    - port: 80  # this is service port (comment)
+	  targetPort: 80  # this is container port (comment)
+	  
+kubectl cretae -f service.yml
+kubectl get svc--> now will get stableIP and NodePort as well(between 30000 to 32767)
+To access internally copy ClusterIP and access
+curl clusterIP
+To access it externally  publicIP + Nodeport number --> need to set SG for that particular server-- delete all groups in that server and give all traffic
+
+Now need to access the application from all servers use LoadBalancer
+ 
+vim service.yml
+---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   name: flm-svc
+   
+  spec:
+   type: LoadBalancer
+   selector: 
+     app: bus
+   ports:
+    - port: 80  # this is service port (comment)
+	  targetPort: 80  # this is container port (comment)
+	  
+kubectl create -f service.yml
+kubectl get svc--> now will get stableIP, NodePort and LoadBalancer
+Now we can access the appliaction from any server
+DNS name will take little bit more time to create and we can access with DNS name as well with http
+
+kubectl delete svc flm-svc--> to delete the service
+
+Here we need to delete the cluster by using command, if we delete servers manually then those will cretaed again automatically
+export KOPS_STATE_STORE=s3://pavan.18kops --> 
+kops get cluster--> to know the cluster name
+kops delete cluster --name pavan1.k8s.local --yes --> to delete the cluster
+
 
 
      
