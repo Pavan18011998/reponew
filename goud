@@ -441,4 +441,684 @@ kops delete cluster --name pavan1.k8s.local --yes --> to delete the cluster
 
 
 
-     
+
+
+
+Class 5 
+
+Replication
+
+Replication Controller:
+1. RC can run specific no.of pods as per our requirement.
+2. It is responsible for managing the pod life cycle
+3. RC is responsible to manage the pods based on on our req. 
+  no autoscaling
+  downtime
+  we can't update image directly
+  No rollback
+
+need to install kops
+
+curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+chmod +x kops
+sudo mv kops /usr/local/bin/kops
+kops version--> to check the version
+
+need to install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+  chmod +x kubectl--> to give the x permissions
+   mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
+   kubectl version--> to check whether installed or not
+
+we need to configure s3 bucket with EC2
+AWS--> actions--> security--> modify IAM role
+aws s3 ls--> to check the s3 buckets
+aws s3 mb s3://pavan18.kops--> to create a bucket in s3
+export KOPS_STATE_STORE=s3://pavan18.kops--> to store the data in a specific bucket
+
+now need to create Cluster
+kops create cluster --name=pavan1.k8s.local --zones=us-east-1a,us-east-1b --master-count=1 --master-size=c7i-flex.large --master-volume-size=30 --node-count=2 --node-size=t3.micro --node-volume-size=20 --image=ami-0ec10929233384c7f
+
+Cluster configuration has been created.
+
+Suggestions:
+ * list clusters with: kops get cluster
+ * edit this cluster with: kops edit cluster pavan1.k8s.local
+ * edit your node instance group: kops edit ig --name=pavan1.k8s.local nodes-us-east-1a
+ * edit your control-plane instance group: kops edit ig --name=pavan1.k8s.local control-plane-us-east-1a
+
+Finally configure your cluster with: kops update cluster --name pavan1.k8s.local --yes --admin (it'll take time)
+kops get cluster--> to check the cluster
+
+we can check what all the resources are getting created in aws
+s3
+vpc
+ec2
+load balancers
+auto scaling
+
+RC->POD->CONT(APP)--> It's a process after writing and creating the RC
+
+vim rc.yml
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: flm
+
+spec:
+  replicas: 3
+  selector:
+    app: swiggy
+  template:
+    metadata:
+      labels:
+        app: swiggy
+    spec:
+      containers:
+        - name: cont-4
+          image: shaikmustafa/dm
+          ports:
+            - containerPort: 80
+
+kubectl create -f rc.yml --> to run the rc file
+kubectl get rc--> to get the rc
+kubectl describe rc flm--> to get all the details
+kubectl get po--> we can see pods after running the rc. pods names are (rcname+ randomID)
+kubectl get po --show-labels--> to check labesl
+
+Now need to write a service file
+
+vim service.yml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysvc
+
+spec:
+  type: LoadBalancer
+  selector:
+    app: swiggy
+  ports:
+    - port: 80
+      targetPort: 80
+
+kubectl create -f service.yml--> to crate a service
+kubectl get svc--> to check services
+now we can access the application internally and externally (publicIP+ port or DNS)
+
+Scaling
+Auto scaling
+Manual scaling
+
+vim rc.yml
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: flm
+
+spec:
+  replicas: 5 #  here we changed the replicas
+  selector:
+    app: swiggy
+  template:
+    metadata:
+      labels:
+        app: swiggy
+    spec:
+      containers:
+        - name: cont-4
+          image: shaikmustafa/dm
+          ports:
+            - containerPort: 80
+
+here we can do scale up and scaledown by giving n0.of replicasin yaml file
+kubectl apply -f rc.yml --> 
+kubectl get po--> 
+
+kubectl delete pod flm-w6xxp--> delete the pod
+It'll create new pod immediatly based on our replicas
+kubectl delete pod --all --> to delet  all the pods. But it'll cretae again based on replicas
+
+by using command also we can scale the pods (increase and decrease)
+kubectl scale rc flm --replicas=6--> to scale up the pods
+kubectl scale rc flm --replicas=3--> to scale down the pods
+
+kubectl delete rc flm--> to dalete the rc, once we dalete rc all pods will be delated and won't create again
+
+In replication controller we can't update the image in existing RC file. Need to delete the RC then update the image in yaml file then create a new RC again 
+
+RC----> old version----> Equality based selector
+RS----> new version----> set based selector
+
+ReplicaSet
+
+cp rc.yml rs.yml--> we are copying the rc.yml file to rs.yml
+
+kubectl api-resources | grep -i "rs"  --> to check the resources
+vim rs.yml
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: devops
+
+spec:
+  replicas: 2 #  here we changed the replicas
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: swiggy
+  template:
+    metadata:
+      labels:
+        app: swiggy
+    spec:
+      containers:
+        - name: cont-4
+          image: shaikmustafa/dm
+          ports:
+            - containerPort: 80
+
+kubectl create -f rs.yml--> to create the RS----
+kubectl get rs-->
+kubectl delete pod devops-tqbk4--> 
+kubectl scale rs devops --replicas=4
+kubectl get po
+
+kubectl delete rs devops-->
+
+cp rs.yml deployment.yml --> copying from RS to deployment
+
+vim deployment.yml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amazon
+
+spec:
+  replicas: 2 #  here we changed the replicas
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: swiggy
+  template:
+    metadata:
+      labels:
+        app: swiggy
+    spec:
+      containers:
+        - name: cont-4
+          image: shaikmustafa/dm
+          ports:
+            - containerPort: 80
+
+
+kubectl create -f deployment.yml--> 
+kubectl get deply-->
+
+Here we need to delete the cluster by using command, if we delete servers manually then those will cretaed again automatically
+export KOPS_STATE_STORE=s3://pavan.18kops --> 
+kops get cluster--> to know the cluster name
+kops delete cluster --name pavan1.k8s.local --yes --> to delete the cluster
+
+
+Class 6
+
+Deployment
+Deploy--> RS--> PODS--> Container
+No Downtime
+We can update image
+Roll back
+manual & auto scaling
+
+need to install kops
+
+curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+chmod +x kops
+sudo mv kops /usr/local/bin/kops
+kops version--> to check the version
+
+need to install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+  chmod +x kubectl--> to give the x permissions
+   mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
+   kubectl version--> to check whether installed or not
+
+we need to configure s3 bucket with EC2
+AWS--> actions--> security--> modify IAM role
+aws s3 ls--> to check the s3 buckets
+aws s3 mb s3://pavan18.kops--> to create a bucket in s3
+export KOPS_STATE_STORE=s3://pavan18.kops--> to store the data in a specific bucket
+
+now need to create Cluster
+kops create cluster --name=pavan1.k8s.local --zones=us-east-1a,us-east-1b --master-count=1 --master-size=c7i-flex.large --master-volume-size=30 --node-count=2 --node-size=t3.micro --node-volume-size=20 --image=ami-0ec10929233384c7f
+
+Cluster configuration has been created.
+
+Suggestions:
+ * list clusters with: kops get cluster
+ * edit this cluster with: kops edit cluster pavan1.k8s.local
+ * edit your node instance group: kops edit ig --name=pavan1.k8s.local nodes-us-east-1a
+ * edit your control-plane instance group: kops edit ig --name=pavan1.k8s.local control-plane-us-east-1a
+
+Finally configure your cluster with: kops update cluster --name pavan1.k8s.local --yes --admin (it'll take time)
+kops get cluster--> to check the cluster
+
+we can check what all the resources are getting created in aws
+s3
+vpc
+ec2
+load balancers
+auto scaling 
+
+vim deployment.yml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flm
+
+spec:
+  replicas: 3 #  here we changed the replicas
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: zomato
+  template:
+    metadata:
+      labels:
+        app: zomaato
+    spec:
+      containers:
+        - name: cont-1
+          image: shaikmustafa/dm
+          ports:
+            - containerPort: 80
+
+
+kubectl create -f deployment.yml--> 
+kubectl get deply--> we can check deployment
+kubectl get rs --> to check the RS, after creating deployment, it'll create rs (rs name: deploy name+rid)
+kubectl get po --> to check the pods, rs will create pods (pod name: rs name+rid)
+
+Now need to expose the pods, so need to create a service file
+
+vim service.yml
+---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   name: mysvc
+   
+  spec:
+   type: LoadBalancer
+   selector: 
+     app: swiggy
+   ports:
+    - port: 80  # this is service port (comment)
+	  targetPort: 80  # this is container port (comment)
+	  
+kubectl create -f service.yml-->
+kubectl get svc-->
+kubectl scale deploy flm --replicas=5--> to scaleup the pods
+kubectl scale deploy flm --replicas=1--> to scaledown the pods
+
+Try to access the appliaction with clusterIP and nodeport or DNS name 
+One of the feature in deployment is we can update the image by using command and manifest file as well
+
+vim deployment.yml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flm
+
+spec:
+  replicas: 3 #  here we changed the replicas
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: zomato
+  template:
+    metadata:
+      labels:
+        app: zomaato
+    spec:
+      containers:
+        - name: cont-1
+          image: shaikmustafa/cycle  # here we have update the image from dm to cycle
+          ports:
+            - containerPort: 80
+			
+kubectl apply -f deployment.yml-->we can check the appliaction running in browser without downtime
+
+we can do the same process for another image as well (ex: shaikmustafa/cycle to shaikmustafa/mygame)
+
+kubectl set image deploy flm cont-1=shaikmustafa/paytm:bus--> by using command also we can update the image
+kubectl rollout status deploy flm --> we can check the whether the image updated or not
+we can access the application without downtime
+kubectl get rs-->
+kubectl rollout undo deploy flm --to-revision=1--> we can rollback to the any vesrion by using this comand
+---> here we are rollback to v1 from v4, whenever we are rollback the v1 will become v5
+kubectl rollout status deploy flm--> to check the status whwther rolled back or not
+kubectl rollout history deploy flm--> here we can check the version
+
+kubectl rollout undo deploy flm --to-revision=3--> we can rollback to the any vesrion by using this comand
+kubectl rollout status deploy flm--> to check the status whwther rolled back or not
+kubectl rollout history deploy flm--> here we can check the versions
+
+In real time will have more versions, at that time we are not sure to which version we can rollback. so, at that time we can give annotation (change cause) to identify the version easily
+kubectl annotate deploy flm kubernetes.io/change-cause="my updated version"--> to give change cause
+kubectl rollout history deploy flm --> here we can check the versions and change cause
+
+Auto scaling;
+Based on CPU utilization the scaling will happen
+By using metric server kubernetes will get to know how much CPU is used.
+
+To install Metric Server
+Install metric server on kubernetes--> click on link (it'll go to github)--> scrool down copy installation link and paste
+
+We have two types of pod autoscaling
+HPA--> Horizontal Pod Autoscaling--> based on traffic it can increases the pods
+VPA--> Vertical Pod Autoscaling--> based on traffic we can increases the resources (CPU & RAM)
+
+After installing we need to write HPA file
+kubectl api-resources | grep -i "hpa"--> to know about hpa
+
+vim hpa.yml
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscalar
+metadata:
+  name: myhpa
+  
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+	kind: Deployment
+	name: flm
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+	  resource:
+	    name: cpu
+		target:
+		  type: Utilization
+		  averageUtilization: 60
+  
+kubectl create -f hpa.yml-->
+kubectlget hpa-->
+kubectl get po-->
+
+Now need to apply the stress by installing stress package i.e., dummy load to check whetherthe pods are increasing or not
+kubectl exec -it flm-hjhhui-jhbj --bash--> to enter into a pod
+apt update -y --> update ubuntu
+apt install stress -y--> to install stress package
+connect kops server in another server to watch the pods
+we can check the pods in other servers
+kubectl get po -w --> to watch the pods in live
+now go to old server
+kubectlstress -c 2 -t 300 -v --> to apply the load
+now we can check the pods are increasing in other servers
+ctrl+c --> to stop the stress --> it'll take little more time
+
+
+Here we need to delete the cluster by using command, if we delete servers manually then those will cretaed again automatically
+export KOPS_STATE_STORE=s3://pavan.18kops --> 
+kops get cluster--> to know the cluster name
+kops delete cluster --name pavan1.k8s.local --yes --> to delete the cluster
+
+
+
+
+Class 7 
+
+Staefulset and DeamonSet
+
+Statesless Application:
+1. It can't store the data permanently.
+2. The word STATELESS means no past data.
+3. It depends on non-persistent data means data is removed when Pod, Node or Cluster is stopped.
+4. Non persistent mainly used for logging info (ex: systtem log, container log etc.,)
+5. In order to avoid this problem, we are using stateful appliaction.
+6. A stateless application can be deployed as a set of identical replicas and each replica can handle incoming requests independently without the need to coordinate with other replicas.
+
+Staeful Application:
+  Stateful appliactions are appliactions that store data and keep tracking it.
+  
+  ex of stateful appliactions
+  . All RDS databases(MYSQL, SQL)
+  . Elastic search, kafka, MangoDB Redis etc.,
+  . Any appliactionthat stores data
+In stateful applications 
+Primary pod--> read and write permission
+Secondar Pod--> read permission only
+
+vim deployment.yml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flm
+
+spec:
+  replicas: 3 #  here we changed the replicas
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: zomato
+  template:
+    metadata:
+      labels:
+        app: zomaato
+    spec:
+      containers:
+        - name: cont-1
+          image: shaikmustafa/mygame
+          ports:
+            - containerPort: 80
+
+
+cp deployment.yml statefulset.yml--> to copy the deployment file data to stateful set data
+
+vim statefulset.yml
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: flm
+
+spec:
+  replicas: 3 #  here we changed the replicas
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: zomato
+  template:
+    metadata:
+      labels:
+        app: zomaato
+    spec:
+      containers:
+        - name: cont-1
+          image: shaikmustafa/mygame
+          ports:
+            - containerPort: 80
+
+kubectl create -f statefulset.yml--> to create the statefulset
+kubectl get statefulset-->  to check the pods in statefulset--> here we can check pods will be created one by one
+kubectl scale statefulset flm --replicas=4--> to scaleup the pods
+kubectl get po--> 
+kubectl scale statefulset flm --replicas=2--> to scale down the pods
+kubectl get po-->
+
+DeamonSet:
+ DeamonSet is used to create an agent on each worker node
+ to get CPU & memory utilization
+ log information
+ to run the script
+
+cp statefulset.yml daemonset.yml
+
+vim daemonset.yml
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: myds
+
+spec:
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: zomato
+  template:
+    metadata:
+      labels:
+        app: zomaato
+    spec:
+      containers:
+        - name: cont-1
+          image: shaikmustafa/mygame
+          ports:
+            - containerPort: 80
+
+kubectl create -f daemonset.yml--> to create the daemonset
+kubectl get ds--> to cehck the ds
+kubectl get po -o wide-->
+kubectl delete statefulset flm--> to delete statefulset 
+
+
+
+
+
+
+
+Class 8
+
+Kuberenetes Namespaces:
+
+
+
+We can go with Minikube installation, no need to install kops cluster, single node cluster is enough
+
+launch EC2 instance
+yum install docker -y && systemctl start docker
+
+Need to install minikube
+curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+
+minikube version--> to check the version
+minikube start --driver=docker --force  -->  to start the minikube
+minikube status--> to check the status
+
+
+need to install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+  chmod +x kubectl--> to give the x permissions
+   mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
+   kubectl version--> to check whether installed or not
+
+kubectl get ns--> to check the namespaces
+kubectl get po-->
+kubectl get po -n kube-system--> we can check the pods in specific namespaces
+kubectl get all -n kube-system--> we can check all the resources in specific namespaces
+
+we can create namespaces in 2 ways 
+ 1. Imperative
+ 2. Delarative
+ 
+--Imperative
+kubectl create ns dev --> to create a ns
+kubectl get ns--> to check ns
+
+--Delarative
+vim namespace.yml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test
+  
+kubectl create -f namepace.yml--> to create namespace
+kubectl get ns--> to check namespaces
+
+how to create a resources inside the namespaces
+kubectl run mypod --image=nginx -n dev--> to create a pod in dev namespace
+kubectl get po -n dev--> to check the pod in dev namespace
+
+to createin declerative way
+vim pod.yml
+---
+apiVersion: v1
+kind: Pod
+metadata
+  name: pod-1
+  namespace: test
+  
+spec:
+  containers:
+   - name: cont-1
+     image: nginx
+	 ports:
+	  - containerPort: 80
+
+kubectl create -f pod.yml--> to create a pod
+kubectl get po -n test--> to check the pod in test ns
+
+vim pod.yml
+---
+apiVersion: v1
+kind: Pod
+metadata
+  name: pod-1
+  
+spec:
+  containers:
+   - name: cont-1
+     image: nginx
+	 ports:
+	  - containerPort: 80
+
+kubectl cretae -f pod.yml -n dev--> if we don't mention namespace in manifest file, then we can give while runningthe command
+
+now create a deployment
+vim deployment.yml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+
+spec:
+  replicas: 2 #  here we changed the replicas
+  selector:
+    matchLabels:  # this is only the diff from RC
+     app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: cont-4
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+
+kubectl create -f deployment.yml -n dev--> to create a deployment in dev ns
+kubectl create -f deployment.yml -n test-->to create a deployment in test ns
+
+kubectl config view | grep -i "namespace" --> to check in which name we are in
+
+kubectl config set-context --current --namespace=dev--> we can change the namespace to another
+kubectl config view | grep -i "namespace" --> to check in which name we are in
+kubect get po --> 
+kubectl run pod-2 --image=httpd--> now the pod will be created in dev ns
+kubectl delete ns test--> we can delete a particular ns, but in real time we can't delete ns directly. 1st need to delete the resources then delete the ns
+
+
+Configmaps:
+Configmaps are used to store the data in key value format(appliaction config data)
+
