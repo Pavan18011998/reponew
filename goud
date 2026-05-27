@@ -664,7 +664,12 @@ kops get cluster--> to know the cluster name
 kops delete cluster --name pavan1.k8s.local --yes --> to delete the cluster
 
 
-Class 6
+
+
+
+
+
+Class 6  (Deployment)
 
 Deployment
 Deploy--> RS--> PODS--> Container
@@ -683,7 +688,7 @@ kops version--> to check the version
 need to install kubectl
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
   chmod +x kubectl--> to give the x permissions
-   mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
+	--> need to move kubectl to default path, then only it'll show as installed
    kubectl version--> to check whether installed or not
 
 we need to configure s3 bucket with EC2
@@ -735,7 +740,7 @@ spec:
           image: shaikmustafa/dm
           ports:
             - containerPort: 80
-
+	
 
 kubectl create -f deployment.yml--> 
 kubectl get deply--> we can check deployment
@@ -851,7 +856,7 @@ kubectl create -f hpa.yml-->
 kubectlget hpa-->
 kubectl get po-->
 
-Now need to apply the stress by installing stress package i.e., dummy load to check whetherthe pods are increasing or not
+Now need to apply the stress by installing stress package i.e., dummy load to check whetherth pods are increasing or not
 kubectl exec -it flm-hjhhui-jhbj --bash--> to enter into a pod
 apt update -y --> update ubuntu
 apt install stress -y--> to install stress package
@@ -872,7 +877,7 @@ kops delete cluster --name pavan1.k8s.local --yes --> to delete the cluster
 
 
 
-Class 7 
+Class 7 (Staefulset and DeamonSet)
 
 Staefulset and DeamonSet
 
@@ -992,7 +997,7 @@ kubectl delete statefulset flm--> to delete statefulset
 
 
 
-Class 8
+Class 8 (Namespaces & configmap)
 
 Kuberenetes Namespaces:
 
@@ -1013,7 +1018,7 @@ minikube status--> to check the status
 
 
 need to install kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+	--> to install kubectl
   chmod +x kubectl--> to give the x permissions
    mv kubectl /usr/local/bin/--> need to move kubectl to default path, then only it'll show as installed
    kubectl version--> to check whether installed or not
@@ -1079,7 +1084,7 @@ spec:
 	 ports:
 	  - containerPort: 80
 
-kubectl cretae -f pod.yml -n dev--> if we don't mention namespace in manifest file, then we can give while runningthe command
+kubectl cretae -f pod.yml -n dev--> if we don't mention namespace in manifest file, then we can give while running the command
 
 now create a deployment
 vim deployment.yml
@@ -1120,5 +1125,316 @@ kubectl delete ns test--> we can delete a particular ns, but in real time we can
 
 
 Configmaps:
-Configmaps are used to store the data in key value format(appliaction config data)
+Configmaps are used to store the data in key value format(appliaction config data) and the data should be non-senstive(don't pass any secrets)
 
+In two ways we can create
+Declarative (manifest file)
+Imperative(Command)
+ 1. --from-literal(CLI)
+ 2. --from-env-file(.env)
+
+vim configmap.yml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+
+data:
+  port: "3306"
+  db_name: "flm-db"
+  course: "devops"
+  cloud: "aws"
+
+kubectl create -f configmap.yml--> to create a configmap file
+kubectl get cm--> to check the configmap files
+kubectl describe cm cm1--> to check in which namespace the configmap is created
+
+Imperative way
+kubectl create cm cm2 --from-literal="name=pavan" --from-literal="company=flm" --from-literal="course=devop"--> created configmap in imperative way
+----> literal= passing the values through CLI
+
+vim app.env
+app=swiggy
+env=dev
+client=tcs
+
+kubectl create cm cm3 --from--env-file=app.env--> to create configmap values in a .env file way
+kubectl get cm--> to check config map files
+kubectl describe cm cm3--> to check the details of configmap
+
+now need to attach configmap to the pod
+1. we can attach a complete cm to pod
+2. we can attach multiple cm
+3. we can attach a spec value from a cm to pod
+4. we can attach a diff values from diff cm to a pod
+
+vim pod.yml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flm-pod
+
+
+spec:
+  containers:
+    - name: cont-1
+      image: nginx
+      ports:
+        - containerPort: 80
+      envFrom:
+        - configMapRef:
+            name: cm1
+        - configMapRef:
+            name: cm2
+
+
+kubectl create -f pod.yml--> to create a pod
+kubectl get po-->
+kubectl exec -it flm-pod -- bash--> we can enter into the pod
+printenv-> here we can check the environmantal variables of cm that are attached to the pod
+exit--> to exit from a pod
+kubectl delete pod flm-pod--> to delete the pod
+
+now need to attach specific variable to the pod 
+
+
+vim pod.yml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flm-pod
+
+
+spec:
+  containers:
+    - name: cont-1
+      image: nginx
+      ports:
+        - containerPort: 80
+      env:
+        - name: mycloud
+          valueFrom:
+            configMapKeyRef:
+              name: cm1
+              key: cloud
+
+        - name: myport
+          valueFrom:
+            configMapKeyRef:
+              name: cm1
+              key: port
+
+        - name: office
+          valueFrom:
+            configMapKeyRef:
+              name: cm2
+              key: company
+			  
+kubectl create -f pod.yml-->
+kubectl get po-->
+kubectl exec -it flm-pod -- bash--> to enter into pod
+printenv--> to print variables
+
+
+
+
+
+
+
+
+
+Class 9 (Secrets & resourcequota)
+
+We can go with Minikube installation, no need to install kops cluster, single node cluster is enough
+
+launch EC2 instance
+yum install docker -y && systemctl start docker
+
+Need to install minikube
+curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+
+minikube version--> to check the version
+minikube start --driver=docker --force  -->  to start the minikube
+minikube status--> to check the status
+
+
+need to install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"--> to install kubectl
+  chmod +x kubectl--> to give the x permissions
+  mv kubectl /usr/local/bin/ --> need to move kubectl to default path, then only it'll show as installed
+   kubectl version--> to check whether installed or not
+   
+ Create a secrets in declarative way 
+vim secret.yml
+ apiVersion: v1
+ kind: Secret
+ metadata:
+   name: sec1
+   
+ data:
+  name: "pavan"
+  place: "hyd"
+  company: "flm"
+  
+kubectl create -f secret.yml --> after runnung this command, the file won't be executed, coz here
+                                 we are exposing the data, to private the data we need to generate a key
+								 and provide the key in the place of data
+echo "pavan" | base64 --> run this command and will get a secret key (ex: bXVzdGFmYQo)
+                           do the same for remaining data as well.
+
+vim secret.yml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sec1
+
+data:
+  Name: "bXVzdGFmYQo="
+  Place: "aHlkCg=="
+  Company: "ZmxtCg=="
+~
+kubectl create -f secret.yml --> now secret will be created
+kubectl get secret--> we can check the secret
+kubectl describe secret sec1--> to chekc the data in secret file
+kubectl get secret sec1 -o yaml--> we ca see encrypted data
+ echo "bXVzdGFmYQo=" | base64 -d--> to decode the data(ex: pavan)
+ 
+imperative way:
+kubectl create secret generic sec2 --from-literal=username=mustafa --from-literal=password=admin@123--> another way to create secret
+kubectl get secret-->
+kubectl get secret sec2--> to check the secret2
+kubectl get secret sec2 -o yaml--> to check in yaml format
+
+by using .env, we can create a secret
+vim app.env
+course=devops
+cloud=aws
+year=2026
+
+kubectl create secret generic sec3 --from-env-file=app.env--> we can create secret by using app.env
+kubectl get secret--> to check
+rm -f app.env --> to delete
+
+now we need to attach a secret to the pod
+vim pod.yml
+apiVerson: v1
+kind: Pod
+metadata:
+  name: pod-1
+
+spec:
+  containers:
+    - name: cont-1
+      image: nginx
+      ports:
+        - containerPort: 80
+
+      envFrom:
+        - secretRef:
+            name: sec1
+        - secretRef:
+            name: sec2
+			
+kubectl create -f pod.yml--> to create and attach pod with secret
+ kubectl exec -it pod-1 -- bash--> to enter into the pod
+ printenv--> to check the data
+This is the way that we can attach entire secret data to the pod
+
+need to attach specific key to the pod
+
+
+Resource Quota:
+In Kubernetes, a ResourceQuota is a way to limit how much cluster resources a namespace can use.
+It helps prevent one team, app, or user from consuming all the CPU, memory, storage, or objects in a cluster.
+Think of it like:
+“This namespace gets only this much of the cluster.”
+
+What ResourceQuota can limit
+A quota can restrict things like:
+
+Total CPU usage
+Total memory usage
+Number of Pods
+Number of Services
+Persistent storage
+LoadBalancers
+ConfigMaps, Secrets, etc.
+
+For every pod will have a container. For each and every container we need to define CPU and RAM, how much needs to be used. 
+Otherwise the resources will be wasted.
+
+Requests:  min req resouces to create a pod
+Limits: max utilization
+
+
+kubectl create ns food--> cretae a namespace 
+
+vim resouece-quota.yml
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: food-req
+  namespace: food
+
+spec:
+  hard:
+    requests.cpu: "500m"
+    limits.cpu: "1000m"
+    requests.memory: "50Mi"
+    limits.memory: "100Mi"
+
+kubectl create -f resouece-quota.yml--> to create a resource quota file
+kubectl get quota -n food--> to check the resource quota in food namespace
+
+vim pod.yml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  namespace: food
+
+spec:
+  containers:
+    - name: cont-1
+      image: nginx
+      ports:
+        - containerPort: 80
+
+kubectl create -f pod.yml--> if we try to create a pod, the pod will not execute because we have not specified the resources
+
+vim pod.yml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  namespace: food
+
+spec:
+  containers:
+    - name: cont-1
+      image: nginx
+      ports:
+        - containerPort: 80
+
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "10Mi"
+        limits:
+          cpu: "100m"
+          memory: "50Mi"    # here we have specified the resource quota in a particular namespace
+
+kubectl create -f pod.yml--> now pod will be created
+kubectl get quota -n food--> now we can check that the resource quota is assigned to a pod in namespace
+
+ 
+
+
+class 10 
